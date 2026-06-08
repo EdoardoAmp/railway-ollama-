@@ -8,4 +8,5 @@ COPY start.sh /app/start.sh
 COPY proxy.py /app/proxy.py
 RUN chmod +x /app/start.sh
 
+ENTRYPOINT []
 CMD ["/bin/sh", "/app/start.sh"]
