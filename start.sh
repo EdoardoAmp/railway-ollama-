@@ -2,8 +2,8 @@
 set -eu
 
 export OLLAMA_HOST=127.0.0.1:11434
-export OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-30m}"
-export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-1}"
+export OLLAMA_KEEP_ALIVE="${ODYSSEUS_KEEP_ALIVE:-30m}"
+export OLLAMA_NUM_PARALLEL="${ODYSSEUS_NUM_PARALLEL:-1}"
 
 echo "Starting Ollama internally on ${OLLAMA_HOST}"
 ollama serve &
@@ -23,10 +23,21 @@ if ! curl -sS http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ -n "${ODYSSEUS_DEFAULT_MODEL:-}" ]; then
-  echo "Pulling default model: ${ODYSSEUS_DEFAULT_MODEL}"
-  ollama pull "${ODYSSEUS_DEFAULT_MODEL}" || echo "WARNING: model pull failed; service will still start"
+# Preload models if enabled
+if [ "${ODYSSEUS_MODEL_PULL_ON_START:-false}" = "true" ]; then
+  PRELOAD_MODELS="${ODYSSEUS_PRELOAD_MODELS:-}"
+  if [ -n "$PRELOAD_MODELS" ]; then
+    echo "Preloading models: $PRELOAD_MODELS"
+    IFS=',' read -ra MODELS <<< "$PRELOAD_MODELS"
+    for model in "${MODELS[@]}"; do
+      model=$(echo "$model" | xargs)  # trim whitespace
+      if [ -n "$model" ]; then
+        echo "Pulling model: $model"
+        ollama pull "$model" || echo "WARNING: Failed to pull $model; continuing"
+      fi
+    done
+  fi
 fi
 
-echo "Starting HTTP proxy on Railway PORT=${PORT}"
-exec uvicorn proxy:app --host 0.0.0.0 --port "${PORT}"
+echo "Starting HTTP proxy on Railway PORT=${PORT:-8080}"
+exec uvicorn proxy:app --host 0.0.0.0 --port "${PORT:-8080}"
